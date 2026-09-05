@@ -355,6 +355,10 @@ func (t *OutboundTransformer) TransformRequest(ctx context.Context, llmReq *llm.
 
 	if hreq.Headers.Get("Version") == "" {
 		hreq.Headers.Set("Version", codexDefaultVersion)
+		// Astra requires Codex >= 0.153.0; keep other models and explicit client versions unchanged.
+		if llmReq.Model == "gpt-6-astra" {
+			hreq.Headers.Set("Version", codexAstraVersion)
+		}
 	}
 
 	return hreq, nil

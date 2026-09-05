@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -25,6 +26,43 @@ type staticTokenGetter struct {
 }
 
 const testChatAccountID = "acct_test"
+
+func TestCodexOutbound_AstraVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name, model, version, want string
+	}{
+		{"astra default", "gpt-6-astra", "", "0.153.3"},
+		{"existing model", "gpt-5.6-sol", "", "0.144.1"},
+		{"explicit version", "gpt-6-astra", "0.154.0", "0.154.0"},
+		{"explicit older version", "gpt-6-astra", "0.144.1", "0.144.1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body, err := json.Marshal(map[string]any{
+				"model":    tc.model,
+				"messages": []map[string]string{{"role": "user", "content": "Hello"}},
+			})
+			require.NoError(t, err)
+			req, err := http.NewRequest(http.MethodPost, "http://localhost:8090/v1/chat/completions", bytes.NewReader(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			if tc.version != "" {
+				req.Header.Set("Version", tc.version)
+			}
+			out, err := newCodexSimulator(t).Simulate(context.Background(), req)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, out.Header.Get("Version"))
+			assert.Equal(t, AxonHubOriginator, out.Header.Get("Originator"))
+			defer out.Body.Close()
+			payload, err := io.ReadAll(out.Body)
+			require.NoError(t, err)
+			assert.Contains(t, string(payload), tc.model)
+		})
+	}
+}
+
+func TestDefaultModelsIncludesAstra(t *testing.T) {
+	assert.Contains(t, DefaultModels(), "gpt-6-astra")
+}
 
 func (g staticTokenGetter) Get(ctx context.Context) (*oauth.OAuthCredentials, error) {
 	return g.creds, nil

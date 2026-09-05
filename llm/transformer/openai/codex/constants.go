@@ -23,6 +23,7 @@ func DefaultModels() []string {
 		"gpt-5.6-sol",
 		"gpt-5.6-terra",
 		"gpt-5.6-luna",
+		"gpt-6-astra",
 	}
 }
 
@@ -38,6 +39,7 @@ const (
 	Scopes      = "openid profile email offline_access"
 
 	codexDefaultVersion = "0.144.1"
+	codexAstraVersion   = "0.153.3"
 
 	// fabricatedBetaFeatures mirrors the X-Codex-Beta-Features value the current
 	// Codex CLI sends, used when a non-Codex inbound client omits the header.
