@@ -1022,7 +1022,7 @@ func (s *SystemService) StoragePolicy(ctx context.Context) (*StoragePolicy, erro
 	value, err := s.getSystemValue(ctx, SystemKeyStoragePolicy)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return lo.ToPtr(defaultStoragePolicy), nil
+			return s.applyRequestPayloadCapture(ctx, lo.ToPtr(defaultStoragePolicy)), nil
 		}
 
 		return nil, fmt.Errorf("failed to get storage policy: %w", err)
@@ -1044,7 +1044,7 @@ func (s *SystemService) StoragePolicy(ctx context.Context) (*StoragePolicy, erro
 
 	policy.CleanupOptions = mergeCleanupOptions(policy.CleanupOptions)
 
-	return &policy, nil
+	return s.applyRequestPayloadCapture(ctx, &policy), nil
 }
 
 // StoragePolicyOrDefault retrieves the storage policy configuration or returns the default policy.
