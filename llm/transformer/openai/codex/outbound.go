@@ -296,7 +296,19 @@ func (t *OutboundTransformer) TransformRequest(ctx context.Context, llmReq *llm.
 	} else if sessionID := ExtractSessionIDFromTurnMetadata(rawTurnMetadata); sessionID != "" {
 		hreq.Headers.Set(SessionHeaderHyphen, sessionID)
 	} else if hreq.Headers.Get(SessionHeaderHyphen) == "" {
-		if sessionID, ok := shared.GetSessionID(ctx); ok {
+		cacheKey := lo.FromPtr(llmReq.PromptCacheKey)
+		if cacheKey == "" && llmReq.Compact != nil {
+			cacheKey = llmReq.Compact.PromptCacheKey
+		}
+		if strings.TrimSpace(cacheKey) != "" {
+			// ChatGPT routes its Responses cache using Session-Id. A client cache
+			// key must therefore take precedence over a generated request session.
+			// Namespace by the trusted caller scope and upstream account so shared
+			// channels do not merge different callers' conversation identities.
+			scope, _ := shared.GetSessionScope(ctx)
+			identity := "axonhub-codex-cache\x00" + scope + "\x00" + accountID + "\x00" + cacheKey
+			hreq.Headers.Set(SessionHeaderHyphen, uuid.NewSHA1(uuid.NameSpaceOID, []byte(identity)).String())
+		} else if sessionID, ok := shared.GetSessionID(ctx); ok {
 			hreq.Headers.Set(SessionHeaderHyphen, sessionID)
 		} else {
 			hreq.Headers.Set(SessionHeaderHyphen, uuid.NewString())
@@ -355,6 +367,10 @@ func (t *OutboundTransformer) TransformRequest(ctx context.Context, llmReq *llm.
 
 	if hreq.Headers.Get("Version") == "" {
 		hreq.Headers.Set("Version", codexDefaultVersion)
+		// Astra requires Codex >= 0.153.0; keep other models and explicit client versions unchanged.
+		if llmReq.Model == "gpt-6-astra" {
+			hreq.Headers.Set("Version", codexAstraVersion)
+		}
 	}
 
 	return hreq, nil
